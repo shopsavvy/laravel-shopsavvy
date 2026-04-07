@@ -1,0 +1,56 @@
+{
+    "name": "shopsavvy/laravel-shopsavvy",
+    "description": "Official Laravel package for the ShopSavvy Data API - product search, real-time pricing, and price history",
+    "keywords": ["shopsavvy", "laravel", "product-data", "pricing", "e-commerce", "price-comparison"],
+    "homepage": "https://shopsavvy.com/integrations/laravel-shopsavvy",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "ShopSavvy Team",
+            "email": "business@shopsavvy.com",
+            "homepage": "https://shopsavvy.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/http": "^10.0|^11.0|^12.0",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "illuminate/cache": "^10.0|^11.0|^12.0",
+        "illuminate/routing": "^10.0|^11.0|^12.0",
+        "illuminate/view": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0|^11.0",
+        "orchestra/testbench": "^8.0|^9.0",
+        "mockery/mockery": "^1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "ShopSavvy\\Laravel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ShopSavvy\\Laravel\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ShopSavvy\\Laravel\\ShopSavvyServiceProvider"
+            ],
+            "aliases": {
+                "ShopSavvy": "ShopSavvy\\Laravel\\ShopSavvyFacade"
+            }
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
