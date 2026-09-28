@@ -14,12 +14,11 @@
         <div class="shopsavvy-price__list" style="display: flex; flex-direction: column; gap: 8px;">
             @foreach ($offers as $offer)
                 @php
-                    $price       = isset($offer['price'])   ? '$' . number_format((float) $offer['price'], 2)   : null;
-                    $msrp        = isset($offer['msrp'])    ? '$' . number_format((float) $offer['msrp'], 2)    : null;
-                    $retailer    = $offer['retailer'] ?? $offer['store'] ?? 'Retailer';
-                    $url         = $offer['url'] ?? null;
-                    $inStock     = $offer['in_stock'] ?? true;
-                    $condition   = $offer['condition'] ?? 'New';
+                    $price       = '$' . number_format((float) $offer['price'], 2);
+                    $retailer    = $offer['retailer'] ?? 'Retailer';
+                    $url         = $offer['URL'] ?? null;
+                    $inStock     = ($offer['availability'] ?? null) !== 'out';
+                    $condition   = $offer['condition'] ?? null;
                 @endphp
                 <div class="shopsavvy-price__offer"
                      style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; gap: 12px;">
@@ -31,12 +30,7 @@
                     </div>
 
                     <div class="shopsavvy-price__pricing" style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
-                        @if ($price)
-                            <span class="shopsavvy-price__amount" style="font-size: 18px; font-weight: 700; color: #059669;">{{ $price }}</span>
-                        @endif
-                        @if ($msrp && $price && $msrp !== $price)
-                            <span class="shopsavvy-price__msrp" style="font-size: 12px; color: #9ca3af; text-decoration: line-through;">{{ $msrp }}</span>
-                        @endif
+                        <span class="shopsavvy-price__amount" style="font-size: 18px; font-weight: 700; color: #059669;">{{ $price }}</span>
                     </div>
 
                     @if (!$inStock)

@@ -21,13 +21,11 @@
         <div class="shopsavvy-search__grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
             @foreach ($products as $product)
                 @php
-                    $title       = $product['title'] ?? $product['name'] ?? 'Unknown Product';
+                    $title       = $product['title'] ?? 'Unknown Product';
                     $brand       = $product['brand'] ?? null;
-                    $image       = $product['image'] ?? $product['image_url'] ?? null;
-                    $lowestPrice = $product['lowest_price'] ?? $product['price'] ?? null;
-                    $price       = $lowestPrice !== null ? '$' . number_format((float) $lowestPrice, 2) : null;
-                    $id          = $product['id'] ?? $product['asin'] ?? $product['upc'] ?? null;
-                    $productUrl  = $product['url'] ?? ($id ? "https://shopsavvy.com/products/{$id}" : null);
+                    $image       = $product['images'][0] ?? null;
+                    // `shopsavvy` is the product path, e.g. "products/3ONn300xybP3y66ibqc1"
+                    $productUrl  = isset($product['shopsavvy']) ? 'https://shopsavvy.com/' . ltrim($product['shopsavvy'], '/') : null;
                 @endphp
                 <div class="shopsavvy-search__product" style="display: flex; flex-direction: column; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #fff;">
                     @if ($image)
@@ -59,12 +57,6 @@
                         </div>
 
                         <div style="flex: 1;"></div>
-
-                        @if ($price)
-                            <div class="shopsavvy-search__price" style="font-size: 17px; font-weight: 700; color: #059669; margin-top: 8px;">
-                                {{ $price }}
-                            </div>
-                        @endif
 
                         @if ($productUrl)
                             <a class="shopsavvy-search__link"

@@ -14,7 +14,7 @@ use ShopSavvy\Laravel\ShopSavvyManager;
  *
  * Usage:
  *   <x-shopsavvy-price identifier="B0BSHF7WHW" />
- *   <x-shopsavvy-price identifier="B0BSHF7WHW" :limit="5" retailer="amazon" />
+ *   <x-shopsavvy-price identifier="B0BSHF7WHW" :limit="5" retailer="amazon.com" />
  */
 class Price extends Component
 {
@@ -37,8 +37,17 @@ class Price extends Component
     private function loadOffers(): void
     {
         try {
-            $result       = $this->shopsavvy->offers($this->identifier, $this->retailer);
-            $all          = $result['data'] ?? $result['offers'] ?? $result ?? [];
+            // { data: [ product + { offers: [...] } ] } -> every offer, cheapest first.
+            $result = $this->shopsavvy->offers($this->identifier, $this->retailer);
+            $all    = [];
+            foreach ($result['data'] ?? [] as $product) {
+                foreach ($product['offers'] ?? [] as $offer) {
+                    if (isset($offer['price'])) {
+                        $all[] = $offer;
+                    }
+                }
+            }
+            usort($all, fn (array $a, array $b) => $a['price'] <=> $b['price']);
             $this->offers = array_slice($all, 0, $this->limit);
         } catch (ShopSavvyException $e) {
             $this->errorMessage = $e->getMessage();

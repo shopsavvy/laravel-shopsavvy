@@ -12,7 +12,7 @@ class PriceCommand extends Command
 {
     protected $signature = 'shopsavvy:price
         {identifier : Product identifier (ASIN, barcode, URL, model number)}
-        {--retailer= : Filter offers by retailer}
+        {--retailer= : Only offers from this retailer domain (e.g. amazon.com)}
         {--history : Include price history for the past 30 days}
         {--json : Output raw JSON}';
 
@@ -56,23 +56,33 @@ class PriceCommand extends Command
         }
 
         // ---- Render offers table ----
+        // GET /products/offers answers { data: [ product + { offers: [...] } ] }; an
+        // identifier can match more than one product, so offers are gathered from all.
 
-        $offers = $offersResult['data'] ?? $offersResult['offers'] ?? $offersResult ?? [];
+        $offers = [];
+        foreach ($offersResult['data'] ?? [] as $product) {
+            foreach ($product['offers'] ?? [] as $offer) {
+                $offers[] = $offer;
+            }
+        }
+        usort($offers, fn (array $a, array $b) => ($a['price'] ?? PHP_FLOAT_MAX) <=> ($b['price'] ?? PHP_FLOAT_MAX));
 
         if (empty($offers)) {
             $this->warn('  No offers found for this product.');
         } else {
             $rows = [];
             foreach ($offers as $offer) {
-                $retailerName = $offer['retailer'] ?? $offer['store'] ?? '—';
-                $price        = isset($offer['price']) ? '$' . number_format((float) $offer['price'], 2) : '—';
-                $condition    = $offer['condition'] ?? 'New';
-                $inStock      = isset($offer['in_stock'])
-                    ? ($offer['in_stock'] ? '<fg=green>Yes</>' : '<fg=red>No</>')
-                    : '—';
-                $url          = $this->truncate($offer['url'] ?? '—', 40);
-
-                $rows[] = [$retailerName, $price, $condition, $inStock, $url];
+                $rows[] = [
+                    $offer['retailer'] ?? '—',
+                    isset($offer['price']) ? '$' . number_format((float) $offer['price'], 2) : '—',
+                    $offer['condition'] ?? '—',
+                    match ($offer['availability'] ?? null) {
+                        'in'    => '<fg=green>Yes</>',
+                        'out'   => '<fg=red>No</>',
+                        default => '—',
+                    },
+                    $this->truncate($offer['URL'] ?? '—', 40),
+                ];
             }
 
             $this->table(
@@ -80,15 +90,14 @@ class PriceCommand extends Command
                 $rows
             );
 
-            // Highlight best price
-            $prices = array_filter(array_column($offers, 'price'));
-            if (!empty($prices)) {
-                $best = min($prices);
-                $this->line("  Best price: <info>\${$best}</info>");
+            $best = $offers[0];
+            if (isset($best['price'])) {
+                $this->line('  Best price: <info>$' . number_format((float) $best['price'], 2) . '</info> at ' . ($best['retailer'] ?? '—'));
             }
         }
 
         // ---- Optionally render price history ----
+        // GET /products/offers/history answers { data: [ product + { offers: [ offer + { history: [ {timestamp, price, currency, availability} ] } ] } ] }.
 
         if ($this->option('history')) {
             $this->line('');
@@ -103,20 +112,25 @@ class PriceCommand extends Command
                     $retailer
                 );
 
-                $history = $historyResult['data'] ?? $historyResult['history'] ?? $historyResult ?? [];
+                $historyRows = [];
+                foreach ($historyResult['data'] ?? [] as $product) {
+                    foreach ($product['offers'] ?? [] as $offer) {
+                        foreach ($offer['history'] ?? [] as $point) {
+                            $historyRows[] = [
+                                $point['timestamp'] ?? '—',
+                                $offer['retailer'] ?? '—',
+                                isset($point['price'])
+                                    ? number_format((float) $point['price'], 2) . ' ' . ($point['currency'] ?? '')
+                                    : '—',
+                            ];
+                        }
+                    }
+                }
+                usort($historyRows, fn (array $a, array $b) => strcmp((string) $a[0], (string) $b[0]));
 
-                if (empty($history)) {
+                if (empty($historyRows)) {
                     $this->warn('  No price history available.');
                 } else {
-                    $historyRows = [];
-                    foreach ($history as $entry) {
-                        $date         = $entry['date'] ?? $entry['timestamp'] ?? '—';
-                        $retailerName = $entry['retailer'] ?? $entry['store'] ?? '—';
-                        $price        = isset($entry['price']) ? '$' . number_format((float) $entry['price'], 2) : '—';
-
-                        $historyRows[] = [$date, $retailerName, $price];
-                    }
-
                     $this->table(['Date', 'Retailer', 'Price'], $historyRows);
                 }
             } catch (ShopSavvyException $e) {

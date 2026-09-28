@@ -40,8 +40,9 @@ class Search extends Component
     {
         try {
             $result          = $this->shopsavvy->search($this->query, $this->limit, $this->offset);
-            $this->products  = $result['data'] ?? $result['products'] ?? $result['results'] ?? $result ?? [];
-            $this->total     = (int) ($result['total'] ?? count($this->products));
+            // { data: [product, ...], pagination: { total, limit, offset, returned } }
+            $this->products  = $result['data'] ?? [];
+            $this->total     = (int) ($result['pagination']['total'] ?? count($this->products));
         } catch (ShopSavvyException $e) {
             $this->errorMessage = $e->getMessage();
         }

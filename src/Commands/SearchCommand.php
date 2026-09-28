@@ -42,7 +42,9 @@ class SearchCommand extends Command
             return self::SUCCESS;
         }
 
-        $products = $result['data'] ?? $result['products'] ?? $result['results'] ?? $result ?? [];
+        // GET /products/search answers { data: [product, ...], pagination: { total, ... } }.
+        // Search results carry product details only (no prices); use shopsavvy:price for offers.
+        $products = $result['data'] ?? [];
 
         if (empty($products)) {
             $this->warn('  No results found.');
@@ -52,21 +54,20 @@ class SearchCommand extends Command
 
         $rows = [];
         foreach ($products as $product) {
-            $title    = $this->truncate($product['title'] ?? $product['name'] ?? 'Unknown', 50);
-            $brand    = $product['brand'] ?? '—';
-            $id       = $product['id'] ?? $product['asin'] ?? $product['upc'] ?? '—';
-            $lowestPrice = $product['lowest_price'] ?? $product['price'] ?? null;
-            $price = $lowestPrice !== null ? '$' . number_format((float) $lowestPrice, 2) : '—';
-
-            $rows[] = [$title, $brand, $id, $price];
+            $rows[] = [
+                $this->truncate((string) ($product['title'] ?? '—'), 50),
+                $product['brand'] ?? '—',
+                isset($product['barcode']) ? (string) $product['barcode'] : '—',
+                $product['amazon'] ?? '—',
+            ];
         }
 
         $this->table(
-            ['Product', 'Brand', 'Identifier', 'Price'],
+            ['Product', 'Brand', 'Barcode', 'ASIN'],
             $rows
         );
 
-        $total = $result['total'] ?? count($products);
+        $total = $result['pagination']['total'] ?? count($products);
         $this->line('');
         $this->line("  Found <comment>{$total}</comment> results. Showing " . count($products) . '.');
         $this->line('');
