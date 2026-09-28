@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ShopSavvy\Laravel;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
@@ -86,7 +87,7 @@ class ShopSavvyClient
      * Get current offers (prices across retailers) for a product.
      *
      * @param string      $identifier Product identifier
-     * @param string|null $retailer   Optional retailer filter
+     * @param string|null $retailer   Optional retailer domain, e.g. "amazon.com"
      *
      * @throws ShopSavvyException
      */
@@ -116,10 +117,13 @@ class ShopSavvyClient
         string $endDate,
         ?string $retailer = null
     ): array {
+        // GET /products/offers/history reads `start`/`end` (OpenAPI spec and
+        // public docs). The server only aliases start_date/end_date for old
+        // SDK installs; new code sends the canonical names.
         $query = [
-            'ids'        => $identifier,
-            'start_date' => $startDate,
-            'end_date'   => $endDate,
+            'ids'   => $identifier,
+            'start' => $startDate,
+            'end'   => $endDate,
         ];
         if ($retailer !== null) {
             $query['retailer'] = $retailer;
@@ -205,6 +209,19 @@ class ShopSavvyClient
                     continue;
                 }
                 throw $e;
+            } catch (ConnectionException $e) {
+                // No response at all (DNS, TLS, timeout): retryable, and must
+                // surface as a ShopSavvyException like every other failure.
+                $lastException = new ShopSavvyException(
+                    'Could not reach the ShopSavvy API: ' . $e->getMessage(),
+                    0,
+                    $e
+                );
+                if ($attempt < $attempts) {
+                    usleep($sleep * 1000 * $attempt);
+                    continue;
+                }
+                throw $lastException;
             } catch (RequestException $e) {
                 $lastException = new ShopSavvyException(
                     'HTTP request failed: ' . $e->getMessage(),
@@ -244,7 +261,7 @@ class ShopSavvyClient
         match (true) {
             $status === 401 || $status === 403 => throw new ShopSavvyAuthenticationException($message, $status),
             $status === 404                    => throw new ShopSavvyNotFoundException($message, $status),
-            $status === 422                    => throw new ShopSavvyValidationException($message, $status),
+            $status === 400 || $status === 422 => throw new ShopSavvyValidationException($message, $status),
             $status === 429                    => throw new ShopSavvyRateLimitException($message, $status),
             default                            => throw new ShopSavvyException($message, $status),
         };

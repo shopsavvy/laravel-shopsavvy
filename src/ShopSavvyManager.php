@@ -49,7 +49,7 @@ class ShopSavvyManager
      * Get current offers (prices across retailers) for a product.
      *
      * @example ShopSavvy::offers('B0BSHF7WHW')
-     * @example ShopSavvy::offers('B0BSHF7WHW', retailer: 'amazon')
+     * @example ShopSavvy::offers('B0BSHF7WHW', retailer: 'amazon.com')
      *
      * @param string      $identifier Product identifier
      * @param string|null $retailer   Optional retailer filter
