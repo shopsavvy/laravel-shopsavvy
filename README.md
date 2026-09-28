@@ -20,8 +20,8 @@ Official Laravel package for the [ShopSavvy Data API](https://shopsavvy.com/data
 
 ## Requirements
 
-- PHP 8.1+
-- Laravel 10, 11, or 12
+- PHP 8.1+ (or newer, as your Laravel version requires)
+- Laravel 10, 11, 12, or 13
 
 ## Installation
 
@@ -29,7 +29,7 @@ Official Laravel package for the [ShopSavvy Data API](https://shopsavvy.com/data
 composer require shopsavvy/laravel-shopsavvy
 ```
 
-Auto-discovery registers the service provider and `ShopSavvy` facade automatically.
+Auto-discovery registers the service provider and `ShopSavvy` facade automatically. The package talks to the API through Laravel's HTTP client and has no other ShopSavvy dependency.
 
 ## Configuration
 
@@ -60,7 +60,7 @@ $results = ShopSavvy::search('iPhone 16', limit: 5);
 
 // Get current offers across retailers
 $offers = ShopSavvy::offers('B0BSHF7WHW');
-$offers = ShopSavvy::offers('B0BSHF7WHW', retailer: 'amazon');
+$offers = ShopSavvy::offers('B0BSHF7WHW', retailer: 'amazon.com'); // retailer domain
 
 // Get price history
 $history = ShopSavvy::priceHistory('B0BSHF7WHW', '2024-01-01', '2024-12-31');
@@ -72,15 +72,34 @@ $deals = ShopSavvy::deals(limit: 20);
 $usage = ShopSavvy::usage();
 ```
 
+Every method returns the decoded API response as an array, in the shape documented at [shopsavvy.com/data/documentation](https://shopsavvy.com/data/documentation):
+
+```php
+$results = ShopSavvy::search('AirPods Pro');
+foreach ($results['data'] as $product) {
+    echo $product['title'] . ' ' . ($product['barcode'] ?? '');
+}
+echo $results['pagination']['total'];
+
+// Offers are grouped per matched product
+$response = ShopSavvy::offers('B0BSHF7WHW');
+foreach ($response['data'] as $product) {
+    foreach ($product['offers'] as $offer) {
+        // id, retailer, price, availability ('in' | 'out'), condition, seller, URL, timestamp
+        echo "{$offer['retailer']}: {$offer['price']}\n";
+    }
+}
+```
+
 ### Blade Components
 
-Display current prices for a product:
+Display current prices for a product, cheapest first:
 
 ```blade
 <x-shopsavvy-price identifier="B0BSHF7WHW" />
 
 {{-- With options --}}
-<x-shopsavvy-price identifier="B0BSHF7WHW" :limit="3" retailer="amazon" />
+<x-shopsavvy-price identifier="B0BSHF7WHW" :limit="3" retailer="amazon.com" />
 ```
 
 Display product search results:
@@ -108,7 +127,7 @@ php artisan shopsavvy:search "MacBook" --json
 
 # Look up prices for a product
 php artisan shopsavvy:price B0BSHF7WHW
-php artisan shopsavvy:price B0BSHF7WHW --retailer=amazon
+php artisan shopsavvy:price B0BSHF7WHW --retailer=amazon.com
 php artisan shopsavvy:price B0BSHF7WHW --history
 php artisan shopsavvy:price B0BSHF7WHW --json
 ```
@@ -168,18 +187,21 @@ SHOPSAVVY_CACHE_STORE=redis
 use ShopSavvy\Laravel\Exceptions\ShopSavvyAuthenticationException;
 use ShopSavvy\Laravel\Exceptions\ShopSavvyNotFoundException;
 use ShopSavvy\Laravel\Exceptions\ShopSavvyRateLimitException;
+use ShopSavvy\Laravel\Exceptions\ShopSavvyValidationException;
 use ShopSavvy\Laravel\Exceptions\ShopSavvyException;
 
 try {
     $offers = ShopSavvy::offers('B0BSHF7WHW');
 } catch (ShopSavvyAuthenticationException $e) {
-    // Invalid or missing API key
+    // Invalid or missing API key (401/403)
+} catch (ShopSavvyValidationException $e) {
+    // Invalid parameters (400/422), not retried
 } catch (ShopSavvyNotFoundException $e) {
     // Product not found
 } catch (ShopSavvyRateLimitException $e) {
     // Rate limited — back off and retry
 } catch (ShopSavvyException $e) {
-    // Other API error
+    // Other API error, or the API could not be reached
 }
 ```
 
@@ -226,6 +248,12 @@ Run with real API integration tests:
 ```bash
 SHOPSAVVY_API_KEY=ss_live_... ./test.sh --integration
 ```
+
+## Links
+
+- [Integration page](https://shopsavvy.com/integrations/laravel)
+- [Data API documentation](https://shopsavvy.com/data/documentation)
+- [Plain PHP SDK](https://github.com/shopsavvy/sdk-php) (`shopsavvy/shopsavvy-sdk-php`) for non-Laravel projects
 
 ## License
 
