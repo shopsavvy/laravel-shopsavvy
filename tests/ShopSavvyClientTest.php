@@ -95,8 +95,9 @@ class ShopSavvyClientTest extends TestCase
     {
         Http::fake([
             'api.shopsavvy.com/v1/products/search*' => Http::response([
-                'data'  => [['id' => 'abc', 'title' => 'AirPods Pro', 'price' => 199.99]],
-                'total' => 1,
+                'success'    => true,
+                'data'       => [['title' => 'AirPods Pro', 'shopsavvy' => 'products/abc', 'barcode' => 194253397168]],
+                'pagination' => ['total' => 1, 'limit' => 5, 'offset' => 0, 'returned' => 1],
             ], 200),
         ]);
 
@@ -118,7 +119,7 @@ class ShopSavvyClientTest extends TestCase
     public function test_search_with_offset(): void
     {
         Http::fake([
-            'api.shopsavvy.com/v1/products/search*' => Http::response(['data' => [], 'total' => 0], 200),
+            'api.shopsavvy.com/v1/products/search*' => Http::response(['success' => true, 'data' => [], 'pagination' => ['total' => 0, 'limit' => 10, 'offset' => 20, 'returned' => 0]], 200),
         ]);
 
         $manager = $this->app->make(ShopSavvyManager::class);
@@ -137,10 +138,15 @@ class ShopSavvyClientTest extends TestCase
     {
         Http::fake([
             'api.shopsavvy.com/v1/products/offers*' => Http::response([
-                'data' => [
-                    ['retailer' => 'Amazon', 'price' => 199.99, 'in_stock' => true],
-                    ['retailer' => 'BestBuy', 'price' => 209.99, 'in_stock' => true],
-                ],
+                'success' => true,
+                'data'    => [[
+                    'title'     => 'AirPods Pro',
+                    'shopsavvy' => 'products/abc',
+                    'offers'    => [
+                        ['id' => 'o1', 'retailer' => 'Amazon', 'price' => 199.99, 'availability' => 'in', 'condition' => 'new', 'URL' => 'https://www.amazon.com/dp/B0BSHF7WHW'],
+                        ['id' => 'o2', 'retailer' => 'Best Buy', 'price' => 209.99, 'availability' => 'in', 'condition' => 'new', 'URL' => 'https://www.bestbuy.com/site/1'],
+                    ],
+                ]],
             ], 200),
         ]);
 
@@ -148,7 +154,7 @@ class ShopSavvyClientTest extends TestCase
         $result  = $manager->offers('B0BSHF7WHW');
 
         $this->assertArrayHasKey('data', $result);
-        $this->assertCount(2, $result['data']);
+        $this->assertCount(2, $result['data'][0]['offers']);
 
         Http::assertSent(function (Request $request) {
             return str_contains($request->url(), '/products/offers')
@@ -163,10 +169,10 @@ class ShopSavvyClientTest extends TestCase
         ]);
 
         $manager = $this->app->make(ShopSavvyManager::class);
-        $manager->offers('B0BSHF7WHW', 'amazon');
+        $manager->offers('B0BSHF7WHW', 'amazon.com');
 
         Http::assertSent(function (Request $request) {
-            return $request->data()['retailer'] === 'amazon';
+            return $request->data()['retailer'] === 'amazon.com';
         });
     }
 
@@ -178,9 +184,16 @@ class ShopSavvyClientTest extends TestCase
     {
         Http::fake([
             'api.shopsavvy.com/v1/products/offers/history*' => Http::response([
-                'data' => [
-                    ['date' => '2024-01-15', 'retailer' => 'Amazon', 'price' => 179.99],
-                ],
+                'success' => true,
+                'data'    => [[
+                    'title'  => 'AirPods Pro',
+                    'offers' => [[
+                        'id'       => 'o1',
+                        'retailer' => 'Amazon',
+                        'price'    => 189.99,
+                        'history'  => [['timestamp' => '2024-01-15T00:00:00Z', 'price' => 179.99, 'currency' => 'USD', 'availability' => 'in']],
+                    ]],
+                ]],
             ], 200),
         ]);
 
@@ -192,8 +205,8 @@ class ShopSavvyClientTest extends TestCase
         Http::assertSent(function (Request $request) {
             return str_contains($request->url(), '/products/offers/history')
                 && $request->data()['ids'] === 'B0BSHF7WHW'
-                && $request->data()['start_date'] === '2024-01-01'
-                && $request->data()['end_date'] === '2024-01-31';
+                && $request->data()['start'] === '2024-01-01'
+                && $request->data()['end'] === '2024-01-31';
         });
     }
 
@@ -268,7 +281,7 @@ class ShopSavvyClientTest extends TestCase
             'api.shopsavvy.com/v1/products/search*' => function () use (&$callCount) {
                 $callCount++;
 
-                return Http::response(['data' => [['title' => 'Cached Product']], 'total' => 1], 200);
+                return Http::response(['success' => true, 'data' => [['title' => 'Cached Product']], 'pagination' => ['total' => 1, 'limit' => 10, 'offset' => 0, 'returned' => 1]], 200);
             },
         ]);
 
